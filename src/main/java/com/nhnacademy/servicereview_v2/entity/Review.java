@@ -25,4 +25,5 @@ public class Review {
     private Long clientId;
     private Long productOrderDetailId;
     private Long productId;
+    private Boolean isDeleted;
 }
