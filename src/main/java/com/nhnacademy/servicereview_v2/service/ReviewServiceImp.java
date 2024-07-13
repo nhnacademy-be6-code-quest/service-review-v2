@@ -4,16 +4,21 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nhnacademy.servicereview_v2.client.ImageClient;
 import com.nhnacademy.servicereview_v2.dto.request.ImageUploadParamsRequestDto;
+import com.nhnacademy.servicereview_v2.dto.request.ReviewUpdateRequestDto;
 import com.nhnacademy.servicereview_v2.dto.request.ReviewWriteRequestDto;
 import com.nhnacademy.servicereview_v2.dto.response.ImageUploadResponseDto;
+import com.nhnacademy.servicereview_v2.dto.response.ReviewInfoResponseDto;
 import com.nhnacademy.servicereview_v2.entity.Review;
+import com.nhnacademy.servicereview_v2.exception.ExistReviewException;
 import com.nhnacademy.servicereview_v2.exception.ImageUploadFailException;
-import com.nhnacademy.servicereview_v2.repository.ReviewImageRespository;
 import com.nhnacademy.servicereview_v2.repository.ReviewRepository;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -27,7 +32,6 @@ import java.util.List;
 public class ReviewServiceImp implements ReviewService {
     private final ImageClient imageClient;
     private final ReviewRepository reviewRepository;
-    private final ReviewImageRespository reviewImageRespository;
     private final ObjectMapper objectMapper;
 
     @Value("${image.manager.secret.key}")
@@ -53,9 +57,14 @@ public class ReviewServiceImp implements ReviewService {
         }
     }
 
+    @Override
     public String writeReview(ReviewWriteRequestDto reviewWriteRequestDto, Long clientId) {
         log.info("Review write request: {}", reviewWriteRequestDto);
+        if (reviewRepository.findByProductOrderDetailIdAndClientId(reviewWriteRequestDto.getProductOrderDetailId(), clientId) != null) {
+            throw new ExistReviewException("Review already exist");
+        }
         reviewRepository.save(Review.builder()
+                        .isDeleted(false)
                         .clientId(clientId)
                         .reviewRegisterDate(LocalDateTime.now())
                         .reviewLastModifyDate(LocalDateTime.now())
@@ -66,5 +75,77 @@ public class ReviewServiceImp implements ReviewService {
                 .build());
         log.info("Review write Success");
         return "Success";
+    }
+
+    @Override
+    public boolean isWrited(Long clientId, Long productOrderDetailId) {
+        return reviewRepository.findByProductOrderDetailIdAndClientId(productOrderDetailId, clientId) != null;
+    }
+
+    @Override
+    public Page<ReviewInfoResponseDto> myReviews(int page, int size, Long clientId) {
+        log.info("myReviews page: {}", page);
+        Sort sort = Sort.by(Sort.Direction.DESC, "reviewRegisterDate");
+        PageRequest pageRequest = PageRequest.of(page, size, sort);
+        return reviewRepository.findByClientId(clientId, pageRequest).map(i -> ReviewInfoResponseDto.builder()
+                .reviewId(i.getReviewId())
+                .reviewScore(i.getReviewScore())
+                .reviewContent(i.getReviewContent())
+                .reviewRegisterDate(i.getReviewRegisterDate())
+                .reviewLastModifyDate(i.getReviewLastModifyDate())
+                .isDeleted(i.getIsDeleted())
+                .clientId(i.getClientId())
+                .productOrderDetailId(i.getProductOrderDetailId())
+                .productId(i.getProductId())
+                .build());
+    }
+
+    @Override
+    public ReviewInfoResponseDto getReviewInfo(Long reviewId) {
+        Review review = reviewRepository.findByReviewId(reviewId);
+        return ReviewInfoResponseDto.builder()
+                .reviewId(review.getReviewId())
+                .reviewScore(review.getReviewScore())
+                .reviewContent(review.getReviewContent())
+                .reviewRegisterDate(review.getReviewRegisterDate())
+                .reviewLastModifyDate(review.getReviewLastModifyDate())
+                .isDeleted(review.getIsDeleted())
+                .clientId(review.getClientId())
+                .productOrderDetailId(review.getProductOrderDetailId())
+                .productId(review.getProductId())
+                .build();
+    }
+
+    @Override
+    public String updateReview(ReviewUpdateRequestDto reviewUpdateDto) {
+        log.info("Review update request: {}", reviewUpdateDto);
+        Review review = reviewRepository.findByReviewId(reviewUpdateDto.getReviewId());
+        review.setReviewContent(reviewUpdateDto.getReviewContent());
+        review.setReviewLastModifyDate(LocalDateTime.now());
+        reviewRepository.save(review);
+        return "Success";
+    }
+
+    @Override
+    public Double getAverageReviewScore(Long productId) {
+        return reviewRepository.getAverageReviewScoreByProductId(productId);
+    }
+
+    @Override
+    public Page<ReviewInfoResponseDto> productReviews(Long productId, int page, int size) {
+        log.info("productReviews page: {}", page);
+        Sort sort = Sort.by(Sort.Direction.DESC, "reviewRegisterDate");
+        PageRequest pageRequest = PageRequest.of(page, size, sort);
+        return reviewRepository.findByProductId(productId, pageRequest).map(i -> ReviewInfoResponseDto.builder()
+                .reviewId(i.getReviewId())
+                .reviewScore(i.getReviewScore())
+                .reviewContent(i.getReviewContent())
+                .reviewRegisterDate(i.getReviewRegisterDate())
+                .reviewLastModifyDate(i.getReviewLastModifyDate())
+                .isDeleted(i.getIsDeleted())
+                .clientId(i.getClientId())
+                .productOrderDetailId(i.getProductOrderDetailId())
+                .productId(i.getProductId())
+                .build());
     }
 }
