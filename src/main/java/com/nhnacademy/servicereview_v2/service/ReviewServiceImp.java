@@ -3,6 +3,7 @@ package com.nhnacademy.servicereview_v2.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nhnacademy.servicereview_v2.client.ImageClient;
+import com.nhnacademy.servicereview_v2.dto.message.ReviewMessageDto;
 import com.nhnacademy.servicereview_v2.dto.request.ImageUploadParamsRequestDto;
 import com.nhnacademy.servicereview_v2.dto.request.ReviewUpdateRequestDto;
 import com.nhnacademy.servicereview_v2.dto.request.ReviewWriteRequestDto;
@@ -15,29 +16,41 @@ import com.nhnacademy.servicereview_v2.repository.ReviewRepository;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ReviewServiceImp implements ReviewService {
     private final ImageClient imageClient;
-    private final ReviewRepository reviewRepository;
     private final ObjectMapper objectMapper;
+    private final RabbitTemplate rabbitTemplate;
+    private final ReviewRepository reviewRepository;
 
     @Value("${image.manager.secret.key}")
     private String secretKey;
     @Value("${image.manager.base.path}")
     private String basePath;
+
+    @Value("${rabbit.review.exchange.name}")
+    private String reviewExchangeName;
+    @Value("${rabbit.review.queue.name}")
+    private String reviewQueueName;
+    @Value("${rabbit.review.routing.key}")
+    private String reviewRoutingKey;
 
     @Override
     public List<ImageUploadResponseDto.SuccessFile> uploadImage(List<MultipartFile> files) {
@@ -74,6 +87,7 @@ public class ReviewServiceImp implements ReviewService {
                         .productOrderDetailId(reviewWriteRequestDto.getProductOrderDetailId())
                 .build());
         log.info("Review write Success");
+        sendWriteReviewMessage(clientId, reviewWriteRequestDto.getReviewContent());
         return "Success";
     }
 
@@ -147,5 +161,20 @@ public class ReviewServiceImp implements ReviewService {
                 .productOrderDetailId(i.getProductOrderDetailId())
                 .productId(i.getProductId())
                 .build());
+    }
+
+    private void sendWriteReviewMessage(Long clientId, String content) {
+        rabbitTemplate.convertAndSend(reviewExchangeName, reviewRoutingKey, new ReviewMessageDto(clientId, containsImage(content)));
+    }
+
+    private boolean containsImage(String htmlString) {
+        if (!StringUtils.hasText(htmlString)) {
+            return false;
+        }
+
+        String regex = "<img\\s+[^>]*src\\s*=\\s*['\"]([^'\"]+)['\"][^>]*>";
+        Pattern pattern = Pattern.compile(regex, Pattern.CASE_INSENSITIVE);
+        Matcher matcher = pattern.matcher(htmlString);
+        return matcher.find();
     }
 }
