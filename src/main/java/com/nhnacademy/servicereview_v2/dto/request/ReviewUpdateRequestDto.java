@@ -5,12 +5,9 @@ import lombok.*;
 @Getter
 @Setter
 @Builder
-@ToString
 @NoArgsConstructor
 @AllArgsConstructor
-public class ReviewWriteRequestDto {
-    private Long productId;
-    private Long productOrderDetailId;
-    private byte reviewScore;
+public class ReviewUpdateRequestDto {
+    private Long reviewId;
     private String reviewContent;
 }
