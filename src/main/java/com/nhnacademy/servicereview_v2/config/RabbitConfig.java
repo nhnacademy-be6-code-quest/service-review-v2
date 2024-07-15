@@ -1,7 +1,5 @@
 package com.nhnacademy.servicereview_v2.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
@@ -21,6 +19,8 @@ public class RabbitConfig {
     private String reviewQueueName;
     @Value("${rabbit.review.routing.key}")
     private String reviewRoutingKey;
+    @Value("${rabbit.review.dlq.routing.key}")
+    private String reviewDlqRoutingKey;
 
     @Bean
     DirectExchange reviewExchange() {
@@ -29,7 +29,10 @@ public class RabbitConfig {
 
     @Bean
     Queue reviewQueue() {
-        return new Queue(reviewQueueName);
+        return QueueBuilder.durable("review-queue")
+                .withArgument("x-dead-letter-exchange", reviewExchangeName)
+                .withArgument("x-dead-letter-routing-key", reviewRoutingKey)
+                .build();
     }
 
     @Bean
