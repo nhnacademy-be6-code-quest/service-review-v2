@@ -167,6 +167,7 @@ public class ReviewServiceImp implements ReviewService {
         rabbitTemplate.convertAndSend(reviewExchangeName, reviewRoutingKey, new ReviewMessageDto(clientId, containsImage(content)));
     }
 
+    @SuppressWarnings("java:S5852") // Be sure to using regex
     private boolean containsImage(String htmlString) {
         if (!StringUtils.hasText(htmlString)) {
             return false;
