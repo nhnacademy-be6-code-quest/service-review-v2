@@ -2,7 +2,6 @@ package com.nhnacademy.servicereview_v2.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nhnacademy.servicereview_v2.client.ImageClient;
 import com.nhnacademy.servicereview_v2.dto.message.ReviewMessageDto;
 import com.nhnacademy.servicereview_v2.dto.request.ImageUploadParamsRequestDto;
 import com.nhnacademy.servicereview_v2.dto.request.ReviewUpdateRequestDto;
@@ -21,9 +20,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
@@ -35,20 +37,17 @@ import java.util.regex.Pattern;
 @Service
 @RequiredArgsConstructor
 public class ReviewServiceImp implements ReviewService {
-    private final ImageClient imageClient;
     private final ObjectMapper objectMapper;
     private final RabbitTemplate rabbitTemplate;
     private final ReviewRepository reviewRepository;
+    private final RestTemplate restTemplate;
+    private final String imageManagerAppKey;
+    private final String imageManagerAppSecret;
 
-    @Value("${image.manager.secret.key}")
-    private String secretKey;
     @Value("${image.manager.base.path}")
     private String basePath;
-
     @Value("${rabbit.review.exchange.name}")
     private String reviewExchangeName;
-    @Value("${rabbit.review.queue.name}")
-    private String reviewQueueName;
     @Value("${rabbit.review.routing.key}")
     private String reviewRoutingKey;
 
@@ -61,10 +60,10 @@ public class ReviewServiceImp implements ReviewService {
 
         try {
             String params = objectMapper.writeValueAsString(paramsDto);
-            ResponseEntity<ImageUploadResponseDto> response = imageClient.registerImages(secretKey, params, files);
+            ResponseEntity<ImageUploadResponseDto> response = registerImages(params, files);
             log.info("Image upload response: {}", response.getBody());
             return response.getBody().getSuccesses();
-        } catch (FeignException | JsonProcessingException e) {
+        } catch (Exception e) {
             log.error(e.getMessage());
             throw new ImageUploadFailException("Image upload failed");
         }
@@ -177,5 +176,20 @@ public class ReviewServiceImp implements ReviewService {
         Pattern pattern = Pattern.compile(regex, Pattern.CASE_INSENSITIVE);
         Matcher matcher = pattern.matcher(htmlString);
         return matcher.find();
+    }
+
+    private ResponseEntity<ImageUploadResponseDto> registerImages(String params, List<MultipartFile> files) {
+        String url = "https://api-image.nhncloudservice.com/image/v2.0/appkeys/" + imageManagerAppKey + "/images";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+        headers.set("Authorization", imageManagerAppSecret);
+
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("params", params);
+        for (MultipartFile file : files) {
+            body.add("files", file.getResource());
+        }
+        return restTemplate.exchange(url, HttpMethod.POST, new HttpEntity<>(body, headers), ImageUploadResponseDto.class);
     }
 }
