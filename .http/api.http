@@ -1,0 +1,12 @@
+POST http://localhost:8080/api/images
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="files"; filename="test.png"
+
+<  /Users/jang-gihwan/Desktop/project/service-review_v2/.http/test.png
+--WebAppBoundary
+
+
+###
+
