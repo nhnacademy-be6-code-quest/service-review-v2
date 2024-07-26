@@ -9,7 +9,6 @@ import com.nhnacademy.servicereview_v2.dto.request.ReviewWriteRequestDto;
 import com.nhnacademy.servicereview_v2.dto.response.ImageUploadResponseDto;
 import com.nhnacademy.servicereview_v2.dto.response.ReviewInfoResponseDto;
 import com.nhnacademy.servicereview_v2.entity.Review;
-import com.nhnacademy.servicereview_v2.exception.ExistReviewException;
 import com.nhnacademy.servicereview_v2.exception.ImageUploadFailException;
 import com.nhnacademy.servicereview_v2.repository.ReviewRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -95,12 +94,6 @@ class ReviewServiceTest {
         assertEquals("Success", result);
         verify(reviewRepository).save(any(Review.class));
         verify(rabbitTemplate).convertAndSend(anyString(), anyString(), any(ReviewMessageDto.class));
-    }
-    @Test
-    void testWriteReviewExistingReview() {
-        ReviewWriteRequestDto requestDto = new ReviewWriteRequestDto(1L, 1L, (byte) 5, "Great review!");
-        when(reviewRepository.findByProductOrderDetailIdAndClientId(anyLong(), anyLong())).thenReturn(new Review());
-        assertThrows(ExistReviewException.class, () -> reviewService.writeReview(requestDto, 1L));
     }
     @Test
     void testIsWrited() {

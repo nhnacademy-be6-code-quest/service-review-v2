@@ -1,6 +1,5 @@
 package com.nhnacademy.servicereview_v2.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nhnacademy.servicereview_v2.dto.message.ReviewMessageDto;
 import com.nhnacademy.servicereview_v2.dto.request.ImageUploadParamsRequestDto;
@@ -12,17 +11,16 @@ import com.nhnacademy.servicereview_v2.entity.Review;
 import com.nhnacademy.servicereview_v2.exception.ExistReviewException;
 import com.nhnacademy.servicereview_v2.exception.ImageUploadFailException;
 import com.nhnacademy.servicereview_v2.repository.ReviewRepository;
-import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
@@ -71,25 +69,27 @@ public class ReviewServiceImp implements ReviewService {
     }
 
     @Override
-    @Transactional
     public String writeReview(ReviewWriteRequestDto reviewWriteRequestDto, Long clientId) {
         log.info("Review write request: {}", reviewWriteRequestDto);
-        if (reviewRepository.findByProductOrderDetailIdAndClientId(reviewWriteRequestDto.getProductOrderDetailId(), clientId) != null) {
-            throw new ExistReviewException("Review already exist");
+        try {
+            reviewRepository.save(Review.builder()
+                    .isDeleted(false)
+                    .clientId(clientId)
+                    .reviewRegisterDate(LocalDateTime.now())
+                    .reviewLastModifyDate(LocalDateTime.now())
+                    .productId(reviewWriteRequestDto.getProductId())
+                    .reviewScore(reviewWriteRequestDto.getReviewScore())
+                    .reviewContent(reviewWriteRequestDto.getReviewContent())
+                    .productOrderDetailId(reviewWriteRequestDto.getProductOrderDetailId())
+                    .build());
+
+            log.info("Review write Success");
+            sendWriteReviewMessage(clientId, reviewWriteRequestDto.getReviewContent());
+            return "Success";
+        } catch (DataIntegrityViolationException e) {
+            log.warn("Duplicate review attempt: {}", reviewWriteRequestDto);
+            throw new ExistReviewException("Review already exists");
         }
-        reviewRepository.save(Review.builder()
-                        .isDeleted(false)
-                        .clientId(clientId)
-                        .reviewRegisterDate(LocalDateTime.now())
-                        .reviewLastModifyDate(LocalDateTime.now())
-                        .productId(reviewWriteRequestDto.getProductId())
-                        .reviewScore(reviewWriteRequestDto.getReviewScore())
-                        .reviewContent(reviewWriteRequestDto.getReviewContent())
-                        .productOrderDetailId(reviewWriteRequestDto.getProductOrderDetailId())
-                .build());
-        log.info("Review write Success");
-        sendWriteReviewMessage(clientId, reviewWriteRequestDto.getReviewContent());
-        return "Success";
     }
 
     @Override

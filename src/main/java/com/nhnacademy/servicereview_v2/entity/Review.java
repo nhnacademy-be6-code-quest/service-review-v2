@@ -1,9 +1,6 @@
 package com.nhnacademy.servicereview_v2.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -14,6 +11,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Table(uniqueConstraints = {@UniqueConstraint(columnNames = {"productOrderDetailId", "clientId"})})
 public class Review {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
