@@ -22,6 +22,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
@@ -70,6 +71,7 @@ public class ReviewServiceImp implements ReviewService {
     }
 
     @Override
+    @Transactional
     public String writeReview(ReviewWriteRequestDto reviewWriteRequestDto, Long clientId) {
         log.info("Review write request: {}", reviewWriteRequestDto);
         if (reviewRepository.findByProductOrderDetailIdAndClientId(reviewWriteRequestDto.getProductOrderDetailId(), clientId) != null) {
