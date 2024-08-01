@@ -52,4 +52,4 @@ jobs:
         key: ${{ secrets.SSH_KEY }}
         port: ${{ secrets.SSH_PORT }}
         script_stop: true
-        script: "./review_startup.sh"
+        script: "./CD/main.sh 9090 11090 service-review_v2-0.0.1-SNAPSHOT.jar review_log"
